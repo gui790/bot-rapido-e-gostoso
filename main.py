@@ -5,10 +5,11 @@ from google import genai
 
 app = FastAPI()
 
-# Suas credenciais
-GEMINI_API_KEY = "SUA_CHAVE_DO_GOOGLE_STUDIO"  AQ.Ab8RN6LrJbk-a4dhFAq5UGe3kqV5RZ3ZjIDBypIYuCK374Ei9w
+# Credenciais
+GEMINI_API_KEY = "AQ.Ab8RN6LrJbk-a4dhFAq5UGe3kqV5RZ3ZjIDBypIYuCK374Ei9w"
 WHATSAPP_TOKEN = "EAAX5E4EptvoBSuPiBmnlSz55AZCF8iz45EXkxAduh8s7SmSyGB4Y9vMLi43lR9ZChjqiqO33FisvKhpjVL4cQUBHuw78WX9DSd8dQ5f5WcWso0fZAzOeZCLlDSAzh5AOTxhCIxeW3gSxMsZBLbb6EYfZCkJGDjPF54wUcAfXMvPgYljCkHBgMEaVFsiVQNp6iyOtpdBeZCQZA7hQ9csXNuplltm3oJbJ6AP75Htf4ZBflr1ZAFtxNPWMpN3ihJZC6ilzNOKPEMq4FJi5w73it1lwBmy"
-PHONE_NUMBER_ID = "SEU_PHONE_NUMBER_ID_AQUI"  1313037015228657
+
+PHONE_NUMBER_ID = "1313037015228657" 
 VERIFY_TOKEN = "rapido_e_gostoso_token"
 
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -90,7 +91,7 @@ async def verify_webhook(request: Request):
 async def handle_whatsapp_message(request: Request):
     data = await request.json()
     try:
-        entry = data["entry"][0]["changes"][0]["value"]
+        entry = data.get("entry", [])[0].get("changes", [])[0].get("value", {})
         if "messages" in entry:
             message_obj = entry["messages"][0]
             from_number = message_obj["from"]
