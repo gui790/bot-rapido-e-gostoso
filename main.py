@@ -5,11 +5,9 @@ from google import genai
 
 app = FastAPI()
 
-# Credenciais
+# Credenciais já configuradas
 GEMINI_API_KEY = "AQ.Ab8RN6LrJbk-a4dhFAq5UGe3kqV5RZ3ZjIDBypIYuCK374Ei9w"
 WHATSAPP_TOKEN = "EAAX5E4EptvoBSuPiBmnlSz55AZCF8iz45EXkxAduh8s7SmSyGB4Y9vMLi43lR9ZChjqiqO33FisvKhpjVL4cQUBHuw78WX9DSd8dQ5f5WcWso0fZAzOeZCLlDSAzh5AOTxhCIxeW3gSxMsZBLbb6EYfZCkJGDjPF54wUcAfXMvPgYljCkHBgMEaVFsiVQNp6iyOtpdBeZCQZA7hQ9csXNuplltm3oJbJ6AP75Htf4ZBflr1ZAFtxNPWMpN3ihJZC6ilzNOKPEMq4FJi5w73it1lwBmy"
-
-PHONE_NUMBER_ID = "1313037015228657" 
 VERIFY_TOKEN = "rapido_e_gostoso_token"
 
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -61,8 +59,8 @@ Mantenha respostas curtas e fáceis de ler no WhatsApp (use negrito e emojis mod
 
 chat_histories = {}
 
-async def send_whatsapp_message(to_number: str, text: str):
-    url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
+async def send_whatsapp_message(phone_number_id: str, to_number: str, text: str):
+    url = f"https://graph.facebook.com/v20.0/{phone_number_id}/messages"
     headers = {
         "Authorization": f"Bearer {WHATSAPP_TOKEN}",
         "Content-Type": "application/json"
@@ -74,7 +72,12 @@ async def send_whatsapp_message(to_number: str, text: str):
         "text": {"body": text}
     }
     async with httpx.AsyncClient() as client:
-        await client.post(url, json=payload, headers=headers)
+        resp = await client.post(url, json=payload, headers=headers)
+        print(f"Envio para WhatsApp: {resp.status_code}")
+
+@app.get("/")
+async def root():
+    return {"status": "Bot Rápido & Gostoso online!"}
 
 @app.get("/webhook")
 async def verify_webhook(request: Request):
@@ -91,30 +94,40 @@ async def verify_webhook(request: Request):
 async def handle_whatsapp_message(request: Request):
     data = await request.json()
     try:
-        entry = data.get("entry", [])[0].get("changes", [])[0].get("value", {})
-        if "messages" in entry:
-            message_obj = entry["messages"][0]
-            from_number = message_obj["from"]
-            user_text = message_obj.get("text", {}).get("body", "")
+        entries = data.get("entry", [])
+        for entry in entries:
+            changes = entry.get("changes", [])
+            for change in changes:
+                value = change.get("value", {})
+                
+                # Identifica o Phone Number ID automaticamente da mensagem
+                metadata = value.get("metadata", {})
+                phone_number_id = metadata.get("phone_number_id")
+                
+                messages = value.get("messages", [])
+                for message_obj in messages:
+                    from_number = message_obj.get("from")
+                    user_text = message_obj.get("text", {}).get("body", "")
 
-            if user_text:
-                if from_number not in chat_histories:
-                    chat_histories[from_number] = []
+                    if user_text and phone_number_id:
+                        if from_number not in chat_histories:
+                            chat_histories[from_number] = []
 
-                history = chat_histories[from_number]
-                history.append(f"Cliente: {user_text}")
+                        history = chat_histories[from_number]
+                        history.append(f"Cliente: {user_text}")
 
-                recent_history = history[-10:]
-                prompt = f"{SYSTEM_PROMPT}\n\nHistórico:\n" + "\n".join(recent_history) + "\n\nAssistente:"
+                        recent_history = history[-10:]
+                        prompt = f"{SYSTEM_PROMPT}\n\nHistórico:\n" + "\n".join(recent_history) + "\n\nAssistente:"
 
-                response = ai_client.models.generate_content(
-                    model="gemini-1.5-flash",
-                    contents=prompt
-                )
-                bot_reply = response.text.strip()
-                history.append(f"Assistente: {bot_reply}")
+                        response = ai_client.models.generate_content(
+                            model="gemini-1.5-flash",
+                            contents=prompt
+                        )
+                        bot_reply = response.text.strip()
+                        history.append(f"Assistente: {bot_reply}")
 
-                await send_whatsapp_message(from_number, bot_reply)
+                        await send_whatsapp_message(phone_number_id, from_number, bot_reply)
     except Exception as e:
         print(f"Erro: {e}")
+        
     return {"status": "ok"}
